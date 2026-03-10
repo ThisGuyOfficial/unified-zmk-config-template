@@ -1,34 +1,65 @@
 name: Build ZMK Firmware
 
-on: [push, workflow_dispatch]
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
 
 jobs:
-  build-left:
+  build:
     runs-on: ubuntu-latest
-    name: Build Left Half
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      
-      - name: Build left half
-        uses: zmkfirmware/zmk-build-action@v1
-        with:
-          board: nice_nano
-          shield: corne_left
-          config-dir: config
-          artifact-name: corne-left
+    container:
+      image: zmkfirmware/zmk-build-arm:stable
+    name: Build Corne Keyboard (Split)
 
-  build-right:
-    runs-on: ubuntu-latest
-    name: Build Right Half
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
-      - name: Build right half
-        uses: zmkfirmware/zmk-build-action@v1
+
+      - name: Initialize west workspace
+        run: |
+          # Initialize west in the current directory
+          west init -l config/
+          west update
+
+      - name: Export Zephyr CMake package
+        working-directory: ./zmk
+        run: |
+          # This generates the Zephyr CMake package
+          west zephyr-export
+
+      - name: Build Left Half
+        working-directory: ./zmk/app
+        run: |
+          echo "🔨 Building LEFT half..."
+          west build -p always -b nice_nano -- \
+            -DSHIELD=corne_left \
+            -DZMK_CONFIG="/workspace/config"
+          mkdir -p /workspace/artifacts
+          cp build/zephyr/zmk.uf2 /workspace/artifacts/corne_left_nice_nano.uf2
+          echo "✅ Left half build complete"
+
+      - name: Clean for right half
+        working-directory: ./zmk/app
+        run: |
+          echo "🧹 Cleaning build directory..."
+          rm -rf build
+
+      - name: Build Right Half
+        working-directory: ./zmk/app
+        run: |
+          echo "🔨 Building RIGHT half..."
+          west build -p always -b nice_nano -- \
+            -DSHIELD=corne_right \
+            -DZMK_CONFIG="/workspace/config"
+          cp build/zephyr/zmk.uf2 /workspace/artifacts/corne_right_nice_nano.uf2
+          echo "✅ Right half build complete"
+
+      - name: Upload firmware
+        uses: actions/upload-artifact@v4
         with:
-          board: nice_nano
-          shield: corne_right
-          config-dir: config
-          artifact-name: corne-right
+          name: corne-firmware
+          path: artifacts/
+          if-no-files-found: error
