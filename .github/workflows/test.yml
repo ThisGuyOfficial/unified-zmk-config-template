@@ -40,7 +40,7 @@ jobs:
         working-directory: ./zmk/app
         run: |
           echo "🔨 Building LEFT half..."
-          west build -p always -b nrf52840dk_nrf52840 -- \
+          west build -p always -b nrfmicro_11 -- \
             -DSHIELD=corne_left \
             -DZMK_CONFIG="/workspace/config"
           
@@ -94,7 +94,7 @@ jobs:
         working-directory: ./zmk/app
         run: |
           echo "🔨 Building RIGHT half..."
-          west build -p always -b nrf52840dk_nrf52840 -- \
+          west build -p always -b nrfmicro_11 -- \
             -DSHIELD=corne_right \
             -DZMK_CONFIG="/workspace/config"
           
