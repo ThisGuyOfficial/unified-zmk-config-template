@@ -18,25 +18,38 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Initialize and update west
+      - name: Cache west modules
+        uses: actions/cache@v4
+        env:
+          cache-name: cache-zephyr-modules
+        with:
+          path: |
+            modules/
+            tools/
+            zephyr/
+            bootloader/
+            zmk/
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('config/west.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+
+      - name: West Init
         run: |
           west init -l config
           west update
 
-      - name: Build Corne Left
+      - name: Build Corne (unified - works for both halves)
         run: |
-          west build -s zmk/app -b nice_nano_v2 -- -DSHIELD=corne_left -DZMK_CONFIG="/workspace/config"
+          west build -s zmk/app -b nice_nano -- -DSHIELD=corne -DZMK_CONFIG="/workspace/config"
           mkdir -p artifacts
-          cp build/zephyr/zmk.uf2 artifacts/corne_left_nice_nano_v2.uf2
-          rm -rf build
-
-      - name: Build Corne Right
-        run: |
-          west build -s zmk/app -b nice_nano_v2 -- -DSHIELD=corne_right -DZMK_CONFIG="/workspace/config"
-          cp build/zephyr/zmk.uf2 artifacts/corne_right_nice_nano_v2.uf2
+          cp build/zephyr/zmk.uf2 artifacts/corne_nice_nano.uf2
+          echo "✅ Built unified firmware for both halves"
 
       - name: Upload firmware
         uses: actions/upload-artifact@v4
         with:
           name: corne-firmware
           path: artifacts/
+          if-no-files-found: error
