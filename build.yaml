@@ -1,19 +1,58 @@
-# This file generates the GitHub Actions matrix.
-# For simple board + shield combinations, add them to the top level board and
-# shield arrays, for more control, add individual board + shield combinations
-# to the `include` property. You can also use the `cmake-args` property to
-# pass flags to the build command, `snippet` to add a Zephyr snippet, and
-# `artifact-name` to assign a name to distinguish build outputs from each other:
-#
- board: [ "nice_nano" ]
- shield: [ "corne_left", "corne_right" ]
-include:
-  - board: bdn9_rev2
-  - board: nice_nano
-     shield: reviung41
-  - board: nice_nano
-    shield: corne_left
-     snippet: studio-rpc-usb-uart
-     cmake-args: -DCONFIG_ZMK_STUDIO=y
-     artifact-name: corne_left_with_studio
+name: Build ZMK Firmware
 
+on: [push, pull_request, workflow_dispatch]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: zmkfirmware/zmk-build-arm:stable
+    name: Build
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Cache west modules
+        uses: actions/cache@v3
+        env:
+          cache-name: cache-zephyr-modules
+        with:
+          path: |
+            modules/
+            tools/
+            zephyr/
+            bootloader/
+            zmk/
+          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('west.yml') }}
+          restore-keys: |
+            ${{ runner.os }}-build-${{ env.cache-name }}-
+            ${{ runner.os }}-build-
+            ${{ runner.os }}-
+
+      - name: West Init
+        run: |
+          west init -l config
+          west update
+
+      - name: West Build (Corne Left)
+        run: |
+          west build -s zmk/app -p always -b nice_nano_v2 -- -DSHIELD=corne_left -DZMK_CONFIG="/workspace/config"
+          mkdir -p artifacts
+          cp build/zephyr/zmk.uf2 artifacts/corne_left_nice_nano_v2.uf2
+
+      - name: West Build (Corne Right)
+        run: |
+          west build -s zmk/app -p always -b nice_nano_v2 -- -DSHIELD=corne_right -DZMK_CONFIG="/workspace/config"
+          cp build/zephyr/zmk.uf2 artifacts/corne_right_nice_nano_v2.uf2
+
+      - name: West Build (Corne - both halves in one file)
+        run: |
+          west build -s zmk/app -p always -b nice_nano_v2 -- -DSHIELD=corne -DZMK_CONFIG="/workspace/config"
+          cp build/zephyr/zmk.uf2 artifacts/corne_nice_nano_v2.uf2
+
+      - name: Archive artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: firmware
+          path: artifacts/
