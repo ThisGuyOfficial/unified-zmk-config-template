@@ -8,27 +8,33 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
+  build-left:
     runs-on: ubuntu-latest
     container:
       image: zmkfirmware/zmk-build-arm:stable
-    name: Build Corne Keyboard (Split)
+    name: Build Left Half
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Create config directory
+        run: |
+          mkdir -p config
+          echo "📁 Config directory contents:"
+          ls -la config/ || true
+
       - name: Initialize west workspace
         run: |
-          # Initialize west in the current directory
           west init -l config/
           west update
+          echo "✅ West initialized"
 
-      - name: Export Zephyr CMake package
+      - name: Export Zephyr
         working-directory: ./zmk
         run: |
-          # This generates the Zephyr CMake package
           west zephyr-export
+          echo "✅ Zephyr exported"
 
       - name: Build Left Half
         working-directory: ./zmk/app
@@ -37,15 +43,52 @@ jobs:
           west build -p always -b nice_nano -- \
             -DSHIELD=corne_left \
             -DZMK_CONFIG="/workspace/config"
-          mkdir -p /workspace/artifacts
-          cp build/zephyr/zmk.uf2 /workspace/artifacts/corne_left_nice_nano.uf2
-          echo "✅ Left half build complete"
+          
+          # Check if build succeeded
+          if [ -f "build/zephyr/zmk.uf2" ]; then
+            echo "✅ Build successful!"
+            mkdir -p /workspace/artifacts
+            cp build/zephyr/zmk.uf2 /workspace/artifacts/corne_left_nice_nano.uf2
+            ls -la /workspace/artifacts/
+          else
+            echo "❌ Build failed - firmware not found"
+            exit 1
+          fi
 
-      - name: Clean for right half
-        working-directory: ./zmk/app
+      - name: Upload left firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: corne-left-firmware
+          path: /workspace/artifacts/corne_left_nice_nano.uf2
+          if-no-files-found: error
+
+  build-right:
+    runs-on: ubuntu-latest
+    container:
+      image: zmkfirmware/zmk-build-arm:stable
+    name: Build Right Half
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create config directory
         run: |
-          echo "🧹 Cleaning build directory..."
-          rm -rf build
+          mkdir -p config
+          echo "📁 Config directory contents:"
+          ls -la config/ || true
+
+      - name: Initialize west workspace
+        run: |
+          west init -l config/
+          west update
+          echo "✅ West initialized"
+
+      - name: Export Zephyr
+        working-directory: ./zmk
+        run: |
+          west zephyr-export
+          echo "✅ Zephyr exported"
 
       - name: Build Right Half
         working-directory: ./zmk/app
@@ -54,12 +97,21 @@ jobs:
           west build -p always -b nice_nano -- \
             -DSHIELD=corne_right \
             -DZMK_CONFIG="/workspace/config"
-          cp build/zephyr/zmk.uf2 /workspace/artifacts/corne_right_nice_nano.uf2
-          echo "✅ Right half build complete"
+          
+          # Check if build succeeded
+          if [ -f "build/zephyr/zmk.uf2" ]; then
+            echo "✅ Build successful!"
+            mkdir -p /workspace/artifacts
+            cp build/zephyr/zmk.uf2 /workspace/artifacts/corne_right_nice_nano.uf2
+            ls -la /workspace/artifacts/
+          else
+            echo "❌ Build failed - firmware not found"
+            exit 1
+          fi
 
-      - name: Upload firmware
+      - name: Upload right firmware
         uses: actions/upload-artifact@v4
         with:
-          name: corne-firmware
-          path: artifacts/
+          name: corne-right-firmware
+          path: /workspace/artifacts/corne_right_nice_nano.uf2
           if-no-files-found: error
