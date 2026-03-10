@@ -1,55 +1,34 @@
 name: Build ZMK Firmware
 
-on:
-  push:
-    branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
-  workflow_dispatch:
+on: [push, workflow_dispatch]
 
 jobs:
-  build:
+  build-left:
     runs-on: ubuntu-latest
-    container:
-      image: zmkfirmware/zmk-build-arm:stable
-    name: Build Corne Keyboard
-
+    name: Build Left Half
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Cache west modules
-        uses: actions/cache@v4
-        env:
-          cache-name: cache-zephyr-modules
+      
+      - name: Build left half
+        uses: zmkfirmware/zmk-build-action@v1
         with:
-          path: |
-            modules/
-            tools/
-            zephyr/
-            bootloader/
-            zmk/
-          key: ${{ runner.os }}-build-${{ env.cache-name }}-${{ hashFiles('config/west.yml') }}
-          restore-keys: |
-            ${{ runner.os }}-build-${{ env.cache-name }}-
-            ${{ runner.os }}-build-
-            ${{ runner.os }}-
+          board: nice_nano
+          shield: corne_left
+          config-dir: config
+          artifact-name: corne-left
 
-      - name: West Init
-        run: |
-          west init -l config
-          west update
-
-      - name: Build Corne (unified - works for both halves)
-        run: |
-          west build -s zmk/app -b nice_nano -- -DSHIELD=corne -DZMK_CONFIG="/workspace/config"
-          mkdir -p artifacts
-          cp build/zephyr/zmk.uf2 artifacts/corne_nice_nano.uf2
-          echo "✅ Built unified firmware for both halves"
-
-      - name: Upload firmware
-        uses: actions/upload-artifact@v4
+  build-right:
+    runs-on: ubuntu-latest
+    name: Build Right Half
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Build right half
+        uses: zmkfirmware/zmk-build-action@v1
         with:
-          name: corne-firmware
-          path: artifacts/
-          if-no-files-found: error
+          board: nice_nano
+          shield: corne_right
+          config-dir: config
+          artifact-name: corne-right
