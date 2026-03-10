@@ -1,0 +1,85 @@
+name: test
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-left:
+    runs-on: ubuntu-latest
+    container:
+      image: zmkfirmware/zmk-build-arm:stable
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup workspace
+        run: |
+          west init -l config
+          west update
+
+      - name: Build Left Half
+        run: |
+          cd zmk/app
+          west build -b pro_micro_nrf52840 -- \
+            -DSHIELD=corne_left \
+            -DZMK_CONFIG="/workspace/config"
+          
+          # Create artifacts directory
+          mkdir -p /workspace/artifacts
+          
+          # Check if build was successful
+          if [ -f "build/zephyr/zmk.uf2" ]; then
+            cp build/zephyr/zmk.uf2 /workspace/artifacts/corne_left.uf2
+            echo "✅ Left half built successfully"
+          else
+            echo "❌ Build failed"
+            exit 1
+          fi
+
+      - name: Upload left firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: corne-left
+          path: /workspace/artifacts/corne_left.uf2
+
+  build-right:
+    runs-on: ubuntu-latest
+    container:
+      image: zmkfirmware/zmk-build-arm:stable
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup workspace
+        run: |
+          west init -l config
+          west update
+
+      - name: Build Right Half
+        run: |
+          cd zmk/app
+          west build -b pro_micro_nrf52840 -- \
+            -DSHIELD=corne_right \
+            -DZMK_CONFIG="/workspace/config"
+          
+          # Create artifacts directory
+          mkdir -p /workspace/artifacts
+          
+          # Check if build was successful
+          if [ -f "build/zephyr/zmk.uf2" ]; then
+            cp build/zephyr/zmk.uf2 /workspace/artifacts/corne_right.uf2
+            echo "✅ Right half built successfully"
+          else
+            echo "❌ Build failed"
+            exit 1
+          fi
+
+      - name: Upload right firmware
+        uses: actions/upload-artifact@v4
+        with:
+          name: corne-right
+          path: /workspace/artifacts/corne_right.uf2
